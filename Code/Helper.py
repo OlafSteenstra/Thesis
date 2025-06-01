@@ -10,6 +10,7 @@ from Vertex import Vertex
 from MPNet import MPNet
 
 def parse_enewick(s: str) -> tuple[set[str], set[tuple[str, str]]]:
+    """Parses an extended Newick string into network vertices and edges."""
     def norm(label: str) -> str:
         return label[1:] if label.startswith('#') else label
 
@@ -68,6 +69,7 @@ def parse_enewick(s: str) -> tuple[set[str], set[tuple[str, str]]]:
     return verts, edges
 
 def enewick_to_network(s: str, viz: bool = False):
+    """Converts an extended Newick string into a PhylogeneticNetwork object."""
     if viz: network = PhylogeneticNetwork_Viz()
     else: network = PhylogeneticNetwork()
     
@@ -99,6 +101,7 @@ def enewick_to_network(s: str, viz: bool = False):
     return network
 
 def read_character_file(path: str) -> dict[str, str]:
+    """Reads character states for leaves from a given file path."""
     char_C = {}
     with open(path) as fh:
         for ln in fh:
@@ -119,6 +122,7 @@ def enewick_from_file(path: str) -> str:
         return fh.read().strip()
     
 def run_from_files(network_txt: str, character_txt: str, viz: bool = False, output_video: str = None):
+    """Runs the approximation algorithm using network and character data from files."""
     nwk = enewick_from_file(network_txt)
     network = enewick_to_network(nwk, viz)
     char_C = read_character_file(character_txt)
@@ -126,6 +130,7 @@ def run_from_files(network_txt: str, character_txt: str, viz: bool = False, outp
     else: network.run_approximation(char_C)
     
 def _normalise_enewick(raw_newick: str) -> str:
+    """Normalizes an extended Newick string to the MPNet format."""
     m_root = re.search(r'\)([^):;,]+)\s*;', raw_newick)
     root_label = m_root.group(1) if m_root else None
     pat_internal = re.compile(r'\)([A-Za-z0-9_]+)')
@@ -152,6 +157,7 @@ def _normalise_enewick(raw_newick: str) -> str:
 
 
 def _build_raw_enewick(net: "PhylogeneticNetwork") -> str:
+    """Builds a raw extended Newick string from a PhylogeneticNetwork object."""
     retic_map: Dict[int, str] = {}
     next_n = 1
     for v in net.vertices.values():
@@ -205,6 +211,7 @@ def export_mpnet_files(network: "PhylogeneticNetwork",
                        newick_path: str | pathlib.Path = "network.txt",
                        character_path: str | pathlib.Path = "character.txt",
                        sort_leaves: bool = True) -> None:
+    """Exports network topology and character data to files for MPNet compatibility."""
     raw   = _build_raw_enewick(network)
     clean = _normalise_enewick(raw)
     pathlib.Path(newick_path).write_text(clean + "\n")
@@ -226,6 +233,7 @@ def export_mpnet_files(network: "PhylogeneticNetwork",
     pathlib.Path(character_path).write_text("\n".join(lines) + "\n")
 
 def compare_to_exact(network: PhylogeneticNetwork, char: dict[str, str], network_str: str, character_str: str):
+    """Compares the approximation algorithm's score to the exact MPNet score."""
     network._initialize_algorithm(char)
     folder = "C:\\Users\\jantj\\Documents\\mpnet\\"
     export_mpnet_files(network, folder+network_str, folder+character_str)

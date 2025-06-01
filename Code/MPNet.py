@@ -5,6 +5,10 @@ CPLEX_HOME = Path(r"C:\Program Files\IBM\ILOG\CPLEX_Studio2212")
 work_dir   = Path(r"C:\Users\jantj\Documents\mpnet")
 
 def MPNet(network, character):
+    """
+    Runs the external Java MPNet solver to find the exact parsimony score.
+    For information on how to install MPNet, see: https://leovaniersel.wordpress.com/software/mpnet/
+    """
     java_cmd = [
         "java",
         "-Xmx8g",

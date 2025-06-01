@@ -5,6 +5,7 @@ import csv
 import os
 
 def test_from_str(char: dict, name: str, enewick_str: str = None, network: PhylogeneticNetwork = None):
+    """Tests the approximation algorithm against the exact MPNet solution."""
     if network is None:
         network = enewick_to_network(enewick_str, False)
     return compare_to_exact(network, char, f"{name}_network.txt", f"{name}_character.txt")
@@ -24,6 +25,7 @@ if header_needed:
     writer.writeheader()
 
 def call_all():
+    """Runs a series of random network tests and records results to a CSV file."""
     test = TestCases()
     for id in range(1, 1000000):
         vertices = random.randint(50, 5000)

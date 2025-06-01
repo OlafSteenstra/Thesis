@@ -2,6 +2,7 @@ import pandas as pd
 import statsmodels.formula.api as smf
 
 def perform_regression(file_path='results.csv'):
+    """Performs a regression analysis on experimental results from a CSV file."""
     try:
         df = pd.read_csv(file_path)
         df["speedup"] = df["exact_time"] / df["algo_time"]

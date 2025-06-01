@@ -9,6 +9,7 @@ PROCESSED = "processed"
 
 class PhylogeneticNetwork:
     def __init__(self):
+        """Initializes an empty phylogenetic network."""
         self.vertices = {}
         self.root = None
         self.leaves = []
@@ -16,6 +17,7 @@ class PhylogeneticNetwork:
         self.char_C = {}
         
     def add_vertex(self, vertex):
+        """Adds a vertex to the network."""
         if vertex.id in self.vertices:
             raise ValueError(f"Vertex with ID {vertex.id} already exists.")
         self.vertices[vertex.id] = vertex
@@ -27,6 +29,7 @@ class PhylogeneticNetwork:
             self.leaves.append(vertex)
     
     def delete_vertex(self, vertex_id):
+        """Deletes a vertex and its associated edges from the network."""
         if vertex_id not in self.vertices:
             raise ValueError(f"Vertex with ID {vertex_id} does not exist.")
         vertex = self.vertices[vertex_id]
@@ -43,6 +46,7 @@ class PhylogeneticNetwork:
             print(f"Warning: Deleted leaf vertex {vertex_id}.")
 
     def add_edge(self, parent_id, child_id):
+        """Adds a directed edge between two vertices in the network."""
         if parent_id not in self.vertices or child_id not in self.vertices:
             raise ValueError(f"Parent ({parent_id}) or Child ({child_id}) vertex not found.")
         parent_vertex = self.vertices[parent_id]
@@ -50,6 +54,7 @@ class PhylogeneticNetwork:
         parent_vertex.add_child(child_vertex)
              
     def _initialize_algorithm(self, char_C):
+        """Initializes node states and statuses for the approximation algorithm."""
         self.char_C = char_C
         self.all_states = set(char_C.values())
 
@@ -68,6 +73,7 @@ class PhylogeneticNetwork:
                 vertex.status = PROCESSED
         
     def _process_tree_node(self, vertex):
+        """Processes a tree or root node, updating its C' set based on children."""
         if vertex.status != UNPROCESSED: 
             return False
         if vertex.type not in ['tree', 'root']: 
@@ -104,6 +110,7 @@ class PhylogeneticNetwork:
         return True
             
     def resolve(self, v: "Vertex") -> None:
+        """Propagates a single character state assignment downwards from a resolved node."""
         stack = [v]
 
         while stack:
@@ -124,6 +131,7 @@ class PhylogeneticNetwork:
                 stack.append(child)
     
     def final_resolve(self, v: "Vertex") -> None:
+        """Finalizes character assignments for all nodes based on the root's final state."""
         if v.final_C is None:
             print(f"Error: Vertex {v.id} has no final C assignment.")
 
@@ -150,7 +158,7 @@ class PhylogeneticNetwork:
 
         
     def _get_reticulation_structure_vertices(self, vr):
-        #Helper to find v1, v2, vr, w1, w2, wr.
+        """Identifies and returns specific vertices forming a reticulation structure."""
         if vr.type != 'reticulation' or len(vr.parents) != 2 or len(vr.children) != 1:
             return None
 
@@ -172,6 +180,7 @@ class PhylogeneticNetwork:
         return v1, v2, vr, w1, w2, wr
  
     def _process_reticulation_structure(self, v1, v2, vr, w1, w2, wr):
+        """Processes a reticulation structure, potentially converting it to a tree."""
         if not (w1 and w2 and wr):
              print(f"Error: Missing vertices for structure around {vr.id}. Cannot process.")
              return False
@@ -215,19 +224,21 @@ class PhylogeneticNetwork:
         return True
     
     def _reticulation_to_tree(self, v1, v2, vr, w2, wr):
-            if len(v2.parents) != 1:
-                    print(f"Error: v2 ({v2.id}) has multiple parents. Cannot process.")
-                    return False
-            v2_parent = v2.parents[0] if v2.parents else None
-            
-            self.delete_vertex(v2.id)
-            v2_parent.add_child(w2)
-            self.delete_vertex(vr.id)
-            v1.add_child(wr)
-            
-            return True
+        """Transforms a reticulation branch into a tree branch by removing vertices."""
+        if len(v2.parents) != 1:
+            print(f"Error: v2 ({v2.id}) has multiple parents. Cannot process.")
+            return False
+        v2_parent = v2.parents[0] if v2.parents else None
+        
+        self.delete_vertex(v2.id)
+        v2_parent.add_child(w2)
+        self.delete_vertex(vr.id)
+        v1.add_child(wr)
+        
+        return True
                 
     def _process_reticulation_workaround(self, vr, v_ready, w_ready, wr):
+        """Applies a workaround to resolve reticulations when only one parent branch is ready."""
         if vr.status != UNPROCESSED or v_ready.status != UNPROCESSED:
              print(f"Error: Workaround called on non-unprocessed vr ({vr.status}) or v_ready ({v_ready.status}).")
              return False
@@ -246,6 +257,7 @@ class PhylogeneticNetwork:
         return True
     
     def _iterative_processing(self) -> None:
+        """Iteratively processes nodes (tree and reticulation) until convergence or stuck."""
         queue_tree  : deque[Vertex]            = deque()
         in_tree_q   : set[int]                 = set()
         queue_retic : deque[tuple]             = deque()
@@ -364,6 +376,7 @@ class PhylogeneticNetwork:
                 return
     
     def _finalize_assignments_and_score(self):
+        """Finalizes character assignments and computes the total parsimony score."""
         if self.root.status != PROCESSED:
             print(f"Error: Root {self.root.id} was not processed. Status: {self.root.status}. Cannot finalize.")
             return None, None
@@ -438,6 +451,7 @@ class PhylogeneticNetwork:
         return total_score, final_assignment
     
     def run_approximation(self, char_C):
+        """Executes the main approximation algorithm for parsimony score."""
         score, assignment = None, None
         try:
             self._initialize_algorithm(char_C)

@@ -14,6 +14,7 @@ PROCESSED = "processed"
 
 class PhylogeneticNetwork_Viz:
     def __init__(self):
+        """Initializes an empty phylogenetic network."""
         self.vertices = {}
         self.root = None
         self.leaves = []
@@ -26,6 +27,7 @@ class PhylogeneticNetwork_Viz:
         self._highlighted_nodes = set()
         
     def add_vertex(self, vertex):
+        """Adds a vertex to the network."""
         if vertex.id in self.vertices:
             raise ValueError(f"Vertex with ID {vertex.id} already exists.")
         self.vertices[vertex.id] = vertex
@@ -37,6 +39,7 @@ class PhylogeneticNetwork_Viz:
             self.leaves.append(vertex)
     
     def delete_vertex(self, vertex_id):
+        """Deletes a vertex and its associated edges from the network."""
         if vertex_id not in self.vertices:
             raise ValueError(f"Vertex with ID {vertex_id} does not exist.")
         vertex = self.vertices[vertex_id]
@@ -53,6 +56,7 @@ class PhylogeneticNetwork_Viz:
             print(f"Warning: Deleted leaf vertex {vertex_id}.")
 
     def add_edge(self, parent_id, child_id):
+        """Adds a directed edge between two vertices in the network."""
         if parent_id not in self.vertices or child_id not in self.vertices:
             raise ValueError(f"Parent ({parent_id}) or Child ({child_id}) vertex not found.")
         parent_vertex = self.vertices[parent_id]
@@ -60,6 +64,7 @@ class PhylogeneticNetwork_Viz:
         parent_vertex.add_child(child_vertex)
         
     def _setup_visualization(self):
+        """Initializes the directory for storing visualization frames."""
         if os.path.exists(self._viz_output_dir):
             shutil.rmtree(self._viz_output_dir)
         os.makedirs(self._viz_output_dir)
@@ -67,6 +72,7 @@ class PhylogeneticNetwork_Viz:
         self._frame_counter = 0
 
     def _get_node_label(self, vertex, phase="processing"):
+        """Generates a text label for a node, including its ID and C' or final_C states."""
         label = f"{vertex.id}\n"
         if phase == "final" and vertex.final_C is not None:
             label += f"[{vertex.final_C}]"
@@ -81,6 +87,7 @@ class PhylogeneticNetwork_Viz:
         return label
 
     def _get_node_color(self, vertex: Vertex):
+        """Determines the display color of a node based on its C' set content."""
         if 0 in vertex.C_prime:
             if 1 in vertex.C_prime:
                 return 'orange'
@@ -94,6 +101,7 @@ class PhylogeneticNetwork_Viz:
     def _create_visualization_frame(self, step_info="Step", phase="processing",
                                 scoring_edges=None,
                                 non_scoring_edges=None):
+        """Generates and saves a single visualization frame of the network state."""
         G = nx.DiGraph()
         for vid in self.vertices:
             G.add_node(vid)
@@ -156,25 +164,25 @@ class PhylogeneticNetwork_Viz:
         self._highlighted_nodes.clear()
 
     def create_output_video(self, output_filename="algo_visualization.gif", fps=2, keep_frames=False):
+        """Compiles all generated frames into an animated GIF."""
         if not self._frames:
             print("No frames generated to create video.")
             return
 
-
         images = [imageio.imread(frame) for frame in self._frames]
-
         try:
             duration_per_frame = 1000 / fps
             imageio.mimsave(output_filename, images, duration=duration_per_frame)
             print(f"Successfully created {output_filename}")
         except Exception as e:
              print(f"Error creating output file: {e}")
-             print("Ensure imageio is installed correctly. For MP4, ffmpeg backend might be needed.")
+             print("Ensure imageio is installed correctly.")
 
         if not keep_frames:
             shutil.rmtree(self._viz_output_dir)
              
     def _initialize_algorithm(self, char_C):
+        """Initializes node states and statuses for the approximation algorithm."""
         self.char_C = char_C
         self.all_states = set(char_C.values())
 
@@ -194,6 +202,7 @@ class PhylogeneticNetwork_Viz:
         self._create_visualization_frame("Initialization Complete")
         
     def _process_tree_node(self, vertex):
+        """Processes a tree or root node, updating its C' set based on children."""
         if vertex.status != UNPROCESSED: 
             return False
         if vertex.type not in ['tree', 'root']: 
@@ -235,6 +244,7 @@ class PhylogeneticNetwork_Viz:
         return True
             
     def resolve(self, v: "Vertex") -> None:
+        """Propagates a single character state assignment downwards from a resolved node."""
         stack = [v]
 
         while stack:
@@ -257,6 +267,7 @@ class PhylogeneticNetwork_Viz:
                 stack.append(child)
     
     def final_resolve(self, v: "Vertex") -> None:
+        """Finalizes character assignments for all nodes based on the root's final state."""
         if v.final_C is None:
             print(f"Error: Vertex {v.id} has no final C assignment.")
 
@@ -285,7 +296,7 @@ class PhylogeneticNetwork_Viz:
 
         
     def _get_reticulation_structure_vertices(self, vr):
-        #Helper to find v1, v2, vr, w1, w2, wr.
+        """Identifies and returns specific vertices forming a reticulation structure."""
         if vr.type != 'reticulation' or len(vr.parents) != 2 or len(vr.children) != 1:
             return None
 
@@ -307,6 +318,7 @@ class PhylogeneticNetwork_Viz:
         return v1, v2, vr, w1, w2, wr
  
     def _process_reticulation_structure(self, v1, v2, vr, w1, w2, wr):
+        """Processes a reticulation structure, potentially converting it to a tree."""
         if not (w1 and w2 and wr):
              print(f"Error: Missing vertices for structure around {vr.id}. Cannot process.")
              return False
@@ -355,20 +367,22 @@ class PhylogeneticNetwork_Viz:
         return True
     
     def _reticulation_to_tree(self, v1, v2, vr, w2, wr):
-            if len(v2.parents) != 1:
-                    print(f"Error: v2 ({v2.id}) has multiple parents. Cannot process.")
-                    return False
-            v2_parent = v2.parents[0] if v2.parents else None
-            
-            self.delete_vertex(v2.id)
-            v2_parent.add_child(w2)            
-            self.delete_vertex(vr.id)
-            v1.add_child(wr)
-            
-            self._create_visualization_frame("Post - Reticulation to Tree")
-            return True
+        """Transforms a reticulation branch into a tree branch by removing vertices."""
+        if len(v2.parents) != 1:
+            print(f"Error: v2 ({v2.id}) has multiple parents. Cannot process.")
+            return False
+        v2_parent = v2.parents[0] if v2.parents else None
+        
+        self.delete_vertex(v2.id)
+        v2_parent.add_child(w2)            
+        self.delete_vertex(vr.id)
+        v1.add_child(wr)
+        
+        self._create_visualization_frame("Post - Reticulation to Tree")
+        return True
                 
     def _process_reticulation_workaround(self, vr, v_ready, w_ready, wr):
+        """Applies a workaround to resolve reticulations when only one parent branch is ready."""
         if vr.status != UNPROCESSED or v_ready.status != UNPROCESSED:
              print(f"Error: Workaround called on non-unprocessed vr ({vr.status}) or v_ready ({v_ready.status}).")
              return False
@@ -391,6 +405,7 @@ class PhylogeneticNetwork_Viz:
         return True
     
     def _iterative_processing(self) -> None:
+        """Iteratively processes nodes (tree and reticulation) until convergence or stuck."""
         queue_tree  : deque[Vertex]            = deque()
         in_tree_q   : set[int]                 = set()
         queue_retic : deque[tuple]             = deque()
@@ -509,6 +524,7 @@ class PhylogeneticNetwork_Viz:
                 return
     
     def _finalize_assignments_and_score(self):
+        """Finalizes character assignments and computes the total parsimony score."""
         if self.root.status != PROCESSED:
             print(f"Error: Root {self.root.id} was not processed. Status: {self.root.status}. Cannot finalize.")
             return None, None
@@ -587,6 +603,7 @@ class PhylogeneticNetwork_Viz:
         return total_score, final_assignment
     
     def run_approximation(self, char_C, output_video="algo_visualization.gif", fps=1, keep_frames=True):
+        """Executes the main approximation algorithm for parsimony score."""
         score, assignment = None, None
         try:
             self._setup_visualization()
