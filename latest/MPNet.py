@@ -1,4 +1,4 @@
-import subprocess, os, sys
+import subprocess
 from pathlib import Path
 
 CPLEX_HOME = Path(r"C:\Program Files\IBM\ILOG\CPLEX_Studio2212")
@@ -7,7 +7,7 @@ work_dir   = Path(r"C:\Users\jantj\Documents\mpnet")
 def MPNet(network, character):
     java_cmd = [
         "java",
-        "-Xmx8g",                                           # ≤8 GB heap
+        "-Xmx8g",
         f"-Djava.library.path={CPLEX_HOME/'cplex/bin/x64_win64'}",
         "-cp", f".;{CPLEX_HOME/'cplex/lib/cplex.jar'}",
         "MPNet",
@@ -23,7 +23,7 @@ def MPNet(network, character):
             cwd=work_dir,
             capture_output=True,
             text=True,
-            timeout=1000,     # wall-clock limit
+            timeout=3600,
             check=True
         )
     except subprocess.TimeoutExpired:

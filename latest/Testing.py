@@ -11,7 +11,7 @@ def test_from_str(char: dict, name: str, enewick_str: str = None, network: Phylo
 
 csv_path     = "results.csv"
 field_order  = [
-    "vertices", "id", "retic_ratio",
+    "vertices", "id", "retic_ratio_goal", "retic_ratio",
     "pre_result", "post_result", "exact_result",
     "pre_ratio", "post_ratio",
     "algo_time", "exact_time",
@@ -26,28 +26,25 @@ if header_needed:
 def call_all():
     test = TestCases()
     for id in range(1, 1000000):
-        vertices = random.randint(5, 5000)
-        rate1 = rate2 = rate3 = 0.5
+        vertices = random.randint(50, 5000)
+        retic_ratio_goal = random.uniform(0, 0.33333)
 
         network, char, retic_ratio = test.random_network(
-            vertices, rate1, rate2, rate3
+            vertices, retic_ratio_goal
         )
         pre_res, post_res, exact_res, algo_time, exact_time = test_from_str(
             char,
             f"random_network_{vertices}_{id}_",
             network=network,
         )
-        # compute derived ratios
+        
         pre_ratio  = pre_res  / exact_res if exact_res else None
         post_ratio = post_res / exact_res if exact_res else None
 
-        if pre_ratio and pre_ratio > 2:
-            print(f"random_network_{vertices}_{id}")
-
-        # stream one row straight to CSV
         writer.writerow({
             "vertices":     vertices,
             "id": id,
+            "retic_ratio_goal": retic_ratio_goal,
             "retic_ratio":  retic_ratio,
             "pre_result":   pre_res,
             "post_result":  post_res,
@@ -57,7 +54,6 @@ def call_all():
             "algo_time":    algo_time,
             "exact_time":   exact_time,
         })
-        csv_file.flush()            # make sure it’s on disk right away
+        csv_file.flush()
 
 call_all()
-# csv_file.close()

@@ -1,37 +1,23 @@
-#!/usr/bin/env python3
-# ------------------------------------------------------------
-#  generate_plots.py
-#
-#  Produce the ten evaluation figures listed in the plan and
-#  save them to disk.  Works directly from the “results.csv”
-#  created earlier (columns assumed: vertices, retic_ratio,
-#  algo_time, exact_time, post_ratio, …).
-# ------------------------------------------------------------
 import os
-import sys
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
-from matplotlib.ticker import LogLocator, NullFormatter
 
-
-# ── CLI & directories ─────────────────────────────────────────
-csv_file = sys.argv[1] if len(sys.argv) > 1 else "results.csv"
-out_dir  = sys.argv[2] if len(sys.argv) > 2 else "plots"
+csv_file = "results.csv"
+out_dir  = "plots"
 os.makedirs(out_dir, exist_ok=True)
 
 # ── Load & enrich data ────────────────────────────────────────
 df = pd.read_csv(csv_file)
 
-# Derived metrics
 df["speedup"]      = df["exact_time"] / df["algo_time"]
-df["approx_ratio"] = df["post_ratio"]                # pick post-ratio as “approximation ratio”
-df["solved"]       = ~df["exact_time"].isna()        # MPNet solved flag
-df["retics"]       = df["retic_ratio"] * df["vertices"]  # retics = reticulation ratio * vertices
-df["diff"]         = df["pre_result"] - df["post_result"]  # difference between exact and approx. results
-df["diff_ratio"]   = df["diff"] / df["exact_result"]  # difference ratio
+df["approx_ratio"] = df["post_ratio"]
+df["solved"]       = ~df["exact_time"].isna()
+df["retics"]       = df["retic_ratio"] * df["vertices"]
+df["diff"]         = df["pre_result"] - df["post_result"]
+df["diff_in_ratio"] = df["pre_ratio"] - df["post_ratio"]
+df["diff_ratio"]   = df["diff"] / df["exact_result"]
 
 # Reticulation & vertex bins for grouped plots
 df["retic_bin"] = pd.cut(
@@ -45,7 +31,6 @@ df["vert_bin"] = pd.cut(
     labels=["<1k", "1k-2k", "2k-3k", "3k-4k", ">4k"]
 )
 
-# Consistent seaborn style
 sns.set_style("whitegrid")
 plt.rcParams["savefig.dpi"] = 300
 
@@ -70,11 +55,21 @@ plt.savefig(f"{out_dir}/diff_vs_retics.png")
 plt.close()
 
 plt.figure(figsize=(6, 4))
+sns.scatterplot(data=df, x="retic_ratio", y="diff")
+plt.axhline(0, ls="--", c="grey", lw=.8)
+plt.xlabel("Reticulation nodes")
+plt.ylabel("Difference in SPS")
+plt.title("Difference between pre- and post-improvement SPS")
+plt.tight_layout()
+plt.savefig(f"{out_dir}/diff_vs_retic.png")
+plt.close()
+
+plt.figure(figsize=(6, 4))
 sns.scatterplot(data=df, x="vertices", y="diff_ratio")
 plt.axhline(0, ls="--", c="grey", lw=.8)
 plt.xlabel("Internal nodes")
 plt.ylabel("Difference in approximation ratio")
-plt.title("Difference between pre- and post-improvement approximation ratio")
+plt.title("Difference between pre- and post-improvement approximation ratio versus internal nodes")
 plt.tight_layout()
 plt.savefig(f"{out_dir}/diff_r_vs_size.png")
 plt.close()
@@ -84,11 +79,30 @@ sns.scatterplot(data=df, x="retics", y="diff_ratio")
 plt.axhline(0, ls="--", c="grey", lw=.8)
 plt.xlabel("Reticulation nodes")
 plt.ylabel("Difference in approximation ratio")
-plt.title("Difference between pre- and post-improvement approximation ratio")
+plt.title("Difference between pre- and post-improvement approximation ratio versus reticulation nodes")
 plt.tight_layout()
 plt.savefig(f"{out_dir}/diff_r_vs_retics.png")
 plt.close()
-# ───────────────── 1.  Runtime vs vertices ───────────────────
+
+plt.figure(figsize=(6, 4))
+sns.scatterplot(data=df, x="retic_ratio", y="diff_ratio")
+plt.axhline(0, ls="--", c="grey", lw=.8)
+plt.xlabel("Reticulation ratio")
+plt.ylabel("Difference in approximation ratio")
+plt.title("Difference between pre- and post-improvement approximation ratio versus reticulation ratio")
+plt.tight_layout()
+plt.savefig(f"{out_dir}/diff_r_vs_retic.png")
+plt.close()
+
+plt.figure(figsize=(6, 4))
+sns.scatterplot(data=df, x="retic_ratio_goal", y="retic_ratio")
+plt.xlabel("Reticulation ratio goal")
+plt.ylabel("Reticulation ratio achieved")
+plt.title("Reticulation ratio goal vs achieved")
+plt.tight_layout()
+plt.savefig(f"{out_dir}/retic_goal_vs_achieved.png")
+plt.close()
+
 plt.figure(figsize=(6, 4))
 sns.scatterplot(data=df, x="vertices", y="exact_time",  label="Exact (MPNet)", marker="o")
 sns.scatterplot(data=df, x="vertices", y="algo_time",   label="Approx.",       marker="s")
@@ -101,7 +115,6 @@ plt.legend()
 plt.savefig(f"{out_dir}/runtime_vs_size.png")
 plt.close()
 
-# ───────────────── 2.  Runtime vs reticulation ───────────────
 plt.figure(figsize=(6, 4))
 sns.scatterplot(data=df, x="retic_ratio", y="exact_time", label="Exact (MPNet)", marker="o")
 sns.scatterplot(data=df, x="retic_ratio", y="algo_time",  label="Approx.",       marker="s")
@@ -126,26 +139,19 @@ plt.legend()
 plt.savefig(f"{out_dir}/runtime_vs_retics.png")
 plt.close()
 
-# ───────────────── 3.  Speed-up curves ───────────────────────
-for xcol, name in [("vertices", "size"), ("retic_ratio", "retic"), ("retics", "retics")]:	
+for xcol, name in [("vertices", "size"), ("retic_ratio", "retic"), ("retics", "reticulation nodes")]:	
     plt.figure(figsize=(6, 4))
-
-    # ── raw points ─────────────────────────────────────────────
     sns.scatterplot(data=df, x=xcol, y="speedup", alpha=0.7)
-
-    # ── trend line: LOWESS (non-parametric) ───────────────────
-    #    scatter=False prevents the points from being re-plotted
     sns.regplot(
         data=df,
         x=xcol,
         y="speedup",
         scatter=False,
-        lowess=True,               # robust locally-weighted smoother
+        lowess=True,
         color="black",
         line_kws={"lw": 1.2},
     )
 
-    # ── axis scales & labels ──────────────────────────────────
     if xcol == "vertices":
         plt.xlabel("Internal nodes")
     elif xcol == "retic_ratio":
@@ -161,13 +167,54 @@ for xcol, name in [("vertices", "size"), ("retic_ratio", "retic"), ("retics", "r
     plt.savefig(f"{out_dir}/speedup_vs_{name}.png")
     plt.close()
 
-# ───────────────── 4.  Approx-ratio histogram & ECDF ─────────
-plt.figure(figsize=(6, 4))
-sns.histplot(df["approx_ratio"].dropna(), bins=30)
-plt.xlabel("Approximation ratio")
-plt.title("Distribution of approximation ratios")
+fig, axes = plt.subplots(1, 2, figsize=(8, 4))
+sns.histplot(df["pre_ratio"].dropna(), bins=30, ax=axes[0])
+axes[0].set_xlabel("Approximation ratio")
+axes[0].set_title("Distribution of pre-improvement approximation ratios")
+
+sns.histplot(df["approx_ratio"].dropna(), bins=30, ax=axes[1])
+axes[1].set_xlabel("Approximation ratio")
+axes[1].set_title("Distribution of post-improvement approximation ratios")
 plt.tight_layout()
-plt.savefig(f"{out_dir}/ratio_histogram.png")
+plt.savefig(f"{out_dir}/combined_histograms.png")
+plt.close(fig)
+
+plot_df = df[['pre_ratio', 'approx_ratio']].copy()
+plot_df.columns = ['Pre-Improvement', 'Post-Improvement']
+melted_df = plot_df.melt(var_name='Improvement Stage', value_name='Approximation Ratio')
+melted_df.dropna(inplace=True)
+plt.figure(figsize=(8, 5))
+sns.histplot(
+    data=melted_df,
+    x="Approximation Ratio",
+    hue="Improvement Stage",
+    bins=30,
+    kde=False,
+    alpha=0.6,
+    common_bins=True,
+    common_norm=False
+)
+plt.xlabel("Approximation ratio")
+plt.ylabel("Count")
+plt.title("Distribution of Approximation Ratios (Pre- vs Post-Improvement)")
+plt.tight_layout()
+plt.savefig(f"{out_dir}/overlaid_histograms.png")
+plt.close()
+
+plt.figure(figsize=(6, 4))
+sns.scatterplot(data=df, x="pre_ratio", y="approx_ratio", alpha=.7)
+plt.xlabel("Pre-improvement approximation ratio")
+plt.ylabel("Post-improvement approximation ratio")
+plt.title("Pre- vs post-improvement approximation ratios")
+plt.savefig(f"{out_dir}/pre_vs_post_approx_ratio.png")
+plt.close()
+
+plt.figure(figsize=(6, 4))
+sns.scatterplot(data=df, x="pre_ratio", y="diff_in_ratio", alpha=.7)
+plt.xlabel("Pre-improvement approximation ratio")
+plt.ylabel("Improvement in approximation ratio")
+plt.title("Improvement in approximation ratios after algorithmic improvement")
+plt.savefig(f"{out_dir}/pre_vs_diff_approx_ratio.png")
 plt.close()
 
 plt.figure(figsize=(6, 4))
@@ -179,17 +226,26 @@ plt.tight_layout()
 plt.savefig(f"{out_dir}/ratio_ecdf.png")
 plt.close()
 
-# ───────────────── 5.  Ratio vs retic (scatter + LOWESS) ─────
 plt.figure(figsize=(6, 4))
 sns.scatterplot(data=df, x="retic_ratio", y="approx_ratio", hue="vert_bin", alpha=.7)
-sns.regplot(data=df, x="retic_ratio", y="approx_ratio", scatter=False, lowess=True, color="black")
 plt.axhline(1, ls="--", c="grey", lw=.8)
 plt.xlabel("Reticulation ratio")
 plt.ylabel("Approximation ratio")
-plt.title("Approximation ratio vs reticulation")
+plt.title("Reticulation ratio vs approximation ratio")
 plt.legend(title="Internal nodes", loc="upper left")
 plt.tight_layout()
 plt.savefig(f"{out_dir}/ratio_vs_retic.png")
 plt.close()
 
-print(f"✓  All ten plots saved to: {out_dir}/")
+plt.figure(figsize=(6, 4))
+sns.scatterplot(data=df, x="retic_ratio", y="pre_ratio", hue="vert_bin", alpha=.7)
+plt.axhline(1, ls="--", c="grey", lw=.8)
+plt.xlabel("Reticulation ratio")
+plt.ylabel("Approximation ratio")
+plt.title("Reticulation ratio vs approximation ratio")
+plt.legend(title="Internal nodes", loc="upper left")
+plt.tight_layout()
+plt.savefig(f"{out_dir}/pre_ratio_vs_retic.png")
+plt.close()
+
+print(f"All plots saved.")

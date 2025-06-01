@@ -104,24 +104,17 @@ class PhylogeneticNetwork:
         return True
             
     def resolve(self, v: "Vertex") -> None:
-        """
-        Iterative version of the original recursive resolve().
-        Behaviour and side-effects on C' sets are identical.
-        """
         stack = [v]
 
         while stack:
             cur = stack.pop()
-            v_prime = cur.C_prime.copy()          # parent’s current C'
+            v_prime = cur.C_prime.copy()
 
-            # visit children in the same left-to-right order as the recursive
-            # version – push them in reverse so the first child is processed first
             for child in reversed(cur.children):
                 if len(child.C_prime) == 1:
                     stack.append(child)
                     continue
 
-                # same logic as before
                 if v_prime <= child.C_prime:
                     child.C_prime = v_prime.copy()
                 else:
@@ -131,10 +124,6 @@ class PhylogeneticNetwork:
                 stack.append(child)
     
     def final_resolve(self, v: "Vertex") -> None:
-        """
-        Iterative version of the original recursive final_resolve().
-        Produces exactly the same final_C assignments and warnings.
-        """
         if v.final_C is None:
             print(f"Error: Vertex {v.id} has no final C assignment.")
 
@@ -145,7 +134,6 @@ class PhylogeneticNetwork:
             v_prime = cur.final_C
 
             for child in reversed(cur.children):
-                # --- mirror the original branch structure -----------------
                 if len(child.C_prime) == 1:
                     child.final_C = min(child.C_prime)
                 else:
@@ -208,14 +196,11 @@ class PhylogeneticNetwork:
                 self.resolve(w1)
             elif w1.C_prime < wr.C_prime:
                 wr.C_prime = w1.C_prime.copy()
-                #TODO: This seems logical but is it correct?
                 C_prime_v1 = w1.C_prime.copy()
                 self.resolve(wr)
                 
         else:
-            #TODO: This is not mentioned in the paper. Is it correct?
             C_prime_vr = w1.C_prime.copy() | wr.C_prime.copy()
-            
             C_prime_v1 = w1.C_prime.copy() | wr.C_prime.copy()
             C_prime_v2 = w2.C_prime.copy() | wr.C_prime.copy()
         
@@ -237,7 +222,6 @@ class PhylogeneticNetwork:
             
             self.delete_vertex(v2.id)
             v2_parent.add_child(w2)
-                     
             self.delete_vertex(vr.id)
             v1.add_child(wr)
             
@@ -298,14 +282,12 @@ class PhylogeneticNetwork:
 
         while True:
             progress_made = False
-
-            # -- Priority 1: process all ready tree/root vertices -----------
+            
             while queue_tree:
                 v = queue_tree.popleft()
                 in_tree_q.discard(v.id)
                 if self._process_tree_node(v):
                     progress_made = True
-                    # its parents may now be ready
                     for p in v.parents:
                         if p.type in ("tree", "root"):
                             _maybe_enqueue_tree(p)
@@ -315,13 +297,11 @@ class PhylogeneticNetwork:
                             if c.type == "reticulation":
                                 _maybe_enqueue_retic(c)
 
-            # -- Priority 2: process one ready reticulation structure -------
             if queue_retic:
                 v1, v2, vr, w1, w2, wr = queue_retic.popleft()
                 in_retic_q.discard(vr.id)
                 if self._process_reticulation_structure(v1, v2, vr, w1, w2, wr):
                     progress_made = True
-                    # parents of v1/v2 might now be ready tree nodes
                     for node in (v1, v2):
                         for p in node.parents:
                             if p.type in ("tree", "root"):
@@ -407,7 +387,6 @@ class PhylogeneticNetwork:
                         ham_dist2 = 0
                     else:
                         ham_dist2 = 1
-                    #TODO: Might have to be the other way around?
                     if ham_dist1 < ham_dist2 or (ham_dist1 == ham_dist2 and random.random() < 0.5):
                         self._reticulation_to_tree(v1, v2, vertex, v2.get_other_child(vertex), vertex.children[0])
                     else:
@@ -427,7 +406,6 @@ class PhylogeneticNetwork:
             if v_node.final_C is None:
                 print(f"Warning: Vertex {v_id} has no final C assignment.")          
 
-        #Categorize Edges for Final Visualization
         scoring_edges_final = []
         non_scoring_edges_final = []
         processed_edges_viz = set()
@@ -454,49 +432,23 @@ class PhylogeneticNetwork:
 
                 processed_edges_viz.add(edge)
 
-        # --- Calculate Final Score (using the same logic as categorization) ---
-        total_score = len(scoring_edges_final) # The score is simply the count of scoring edges
+        total_score = len(scoring_edges_final)
 
         final_assignment = {vid: v.final_C for vid, v in self.vertices.items()}
         return total_score, final_assignment
     
     def run_approximation(self, char_C):
-        """
-        Executes the 2-approximation algorithm and generates visualization.
-        Args:
-            char_C (dict): Leaf ID -> character state map.
-            output_video (str): Filename for the output GIF/MP4.
-            fps (int): Frames per second for the output.
-            keep_frames (bool): If True, keeps the individual frame images.
-        Returns:
-            tuple: (final_score, final_assignment) or (None, None) on failure.
-        """
         score, assignment = None, None
         try:
             self._initialize_algorithm(char_C)
             self._iterative_processing()
             pre_score, assignment = self._finalize_assignments_and_score()
-            #TESTING: WHAT IF I RUN ALGO AGAIN?
-            for v_id, v_node in self.vertices.items():
-                if v_node.status != PROCESSED:
-                    print(f"Warning: Vertex {v_id} was not processed. Status: {v_node.status}.")
-                    continue
-                if v_node.type == 'reticulation':
-                    print(f"Warning: Reticulation {v_id} was not deleted. Type: {v_node.type}.")
-                    continue
-                if v_node.final_C is None:
-                    print(f"Warning: Vertex {v_id} has no final C assignment.")
-                    continue
-                if v_node.type in ('tree', 'root'):
-                    v_node.C_prime = set()
-                    v_node.final_C = None
-                    continue
             self._initialize_algorithm(char_C)
             self._iterative_processing()
             score, assignment = self._finalize_assignments_and_score()
             return pre_score, score, assignment
         except Exception as e:
-            print(f"\n--- Algorithm Failed ---")
+            print(f"Algorithm Failed")
             print(f"Error: {e}")
             import traceback
             traceback.print_exc()

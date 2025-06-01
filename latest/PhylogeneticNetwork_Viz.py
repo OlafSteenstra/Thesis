@@ -20,7 +20,6 @@ class PhylogeneticNetwork_Viz:
         self.all_states = None
         self.char_C = {}
         
-        #Visualization Attributes
         self._frames = []
         self._frame_counter = 0
         self._viz_output_dir = "_algo_viz_frames"
@@ -61,7 +60,6 @@ class PhylogeneticNetwork_Viz:
         parent_vertex.add_child(child_vertex)
         
     def _setup_visualization(self):
-        #Creates the temporary directory for frames.
         if os.path.exists(self._viz_output_dir):
             shutil.rmtree(self._viz_output_dir)
         os.makedirs(self._viz_output_dir)
@@ -82,58 +80,42 @@ class PhylogeneticNetwork_Viz:
              label += "{}"
         return label
 
-    def _get_node_color(self, vertex):
-        if vertex.id in self._highlighted_nodes:
+    def _get_node_color(self, vertex: Vertex):
+        if 0 in vertex.C_prime:
+            if 1 in vertex.C_prime:
+                return 'orange'
+            else:
+                return 'red'
+        elif 1 in vertex.C_prime:
             return 'yellow'
-        elif vertex.status == PROCESSED:
-            return 'lightgreen'
-        elif vertex.status == PROCESSING:
-             return 'orange'
         else:
             return 'lightgrey'
 
     def _create_visualization_frame(self, step_info="Step", phase="processing",
                                 scoring_edges=None,
                                 non_scoring_edges=None):
-        """Creates and saves a single frame of the visualization.
-
-        Args:
-            step_info (str): Text for the plot title.
-            phase (str): 'processing' or 'final' (controls label content).
-            scoring_edges (list, optional): Edges contributing to score (draw red).
-            non_scoring_edges (list, optional): Active edges not contributing (draw black).
-            inactive_edges (list, optional): Inactive reticulation edges (draw grey/dashed).
-        """
         G = nx.DiGraph()
         for vid in self.vertices:
             G.add_node(vid)
 
-        # Determine which edges to draw if categorized lists are not provided
-        # (for frames generated *before* the final scoring categorization)
         all_edges_for_layout = []
         if scoring_edges is None and non_scoring_edges is None:
-            # Default behavior: categorize based on current active_parent_idx
-            # for visualization *during* processing phases
             _tree_edges = []
             for u_id, u_vertex in self.vertices.items():
                 for v_vertex in u_vertex.children:
                     edge = (u_id, v_vertex.id)
                     _tree_edges.append(edge)
-            # In this default mode, draw active/tree edges normally, inactive ones dashed
             edges_to_draw_normal = _tree_edges
-            edges_to_draw_scoring = [] # No scoring emphasis during processing
+            edges_to_draw_scoring = []
             all_edges_for_layout = edges_to_draw_normal
 
         else:
-            # Use provided lists (for final scoring frames)
             edges_to_draw_scoring = scoring_edges if scoring_edges is not None else []
             edges_to_draw_normal = non_scoring_edges if non_scoring_edges is not None else []
             all_edges_for_layout = edges_to_draw_scoring + edges_to_draw_normal
 
-        # --- Layout ---
         pos = None
         try:
-            # Use all edges for layout calculation
             layout_G = nx.DiGraph()
             layout_G.add_nodes_from(G.nodes())
             layout_G.add_edges_from(all_edges_for_layout)
@@ -141,35 +123,31 @@ class PhylogeneticNetwork_Viz:
             
         except Exception as e:
             print(f"Graphviz layout failed ({e}). Falling back.")
-            pos = nx.spring_layout(G, seed=42) # Fallback layout
+            pos = nx.spring_layout(G, seed=42)
 
         plt.figure(figsize=(12, 8))
 
-        # --- Drawing ---
         node_labels = {vid: self._get_node_label(v, phase) for vid, v in self.vertices.items()}
         node_colors = [self._get_node_color(self.vertices[vid]) for vid in G.nodes()]
 
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=800, alpha=0.9)
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.9)
 
-        # --- Draw Edges by Category ---
         edge_alpha = 0.8
-        connection_style='arc3,rad=0.1'
+        connection_style='arc3,rad=0.05'
         arrow_style = '-|>'
-        arrow_size = 15
+        arrow_size = 25
 
-        # Scoring Edges (Red)
         nx.draw_networkx_edges(G, pos, edgelist=edges_to_draw_scoring,
                             arrows=True, arrowstyle=arrow_style, arrowsize=arrow_size,
-                            node_size=800, connectionstyle=connection_style,
+                            node_size=2000, connectionstyle=connection_style,
                             edge_color='red', width=2.0, alpha=edge_alpha)
 
-        # Non-Scoring Active/Tree Edges (Black)
         nx.draw_networkx_edges(G, pos, edgelist=edges_to_draw_normal,
                             arrows=True, arrowstyle=arrow_style, arrowsize=arrow_size,
-                            node_size=800, connectionstyle=connection_style,
+                            node_size=2000, connectionstyle=connection_style,
                             edge_color='black', width=1.5, alpha=edge_alpha)
 
-        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=8)
+        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=15)
         plt.title(f"{step_info} (Frame {self._frame_counter})")
         plt.axis('off'); plt.tight_layout()
         frame_filename = os.path.join(self._viz_output_dir, f"frame_{self._frame_counter:04d}.png")
@@ -178,38 +156,23 @@ class PhylogeneticNetwork_Viz:
         self._highlighted_nodes.clear()
 
     def create_output_video(self, output_filename="algo_visualization.gif", fps=2, keep_frames=False):
-        """Creates a GIF or MP4 from the saved frames."""
         if not self._frames:
             print("No frames generated to create video.")
             return
 
-        print(f"\nCreating output: {output_filename} at {fps} FPS...")
-        _, ext = os.path.splitext(output_filename)
-        is_gif = ext.lower() == '.gif'
 
         images = [imageio.imread(frame) for frame in self._frames]
 
         try:
-            if is_gif:
-                # Duration based on fps for GIF
-                duration_per_frame = 1000 / fps
-                imageio.mimsave(output_filename, images, duration=duration_per_frame)
-            else: # Assume video format like MP4
-                # Use imageio writer
-                with imageio.get_writer(output_filename, fps=fps) as writer:
-                    for image in images:
-                        writer.append_data(image)
+            duration_per_frame = 1000 / fps
+            imageio.mimsave(output_filename, images, duration=duration_per_frame)
             print(f"Successfully created {output_filename}")
         except Exception as e:
              print(f"Error creating output file: {e}")
              print("Ensure imageio is installed correctly. For MP4, ffmpeg backend might be needed.")
 
-        # --- Cleanup ---
         if not keep_frames:
-            print(f"Removing temporary frame directory: {self._viz_output_dir}")
             shutil.rmtree(self._viz_output_dir)
-        else:
-             print(f"Keeping frames in: {self._viz_output_dir}")
              
     def _initialize_algorithm(self, char_C):
         self.char_C = char_C
@@ -249,15 +212,12 @@ class PhylogeneticNetwork_Viz:
         if not (c1.status == PROCESSED and c2.status == PROCESSED):
             return False
 
-        self._highlighted_nodes = {vertex.id}
         step_info = f"Processing Tree/Root Node {vertex.id}"
-        self._create_visualization_frame(step_info + " - Start")
 
         intersection = c1.C_prime.intersection(c2.C_prime)
         if intersection:
             vertex.C_prime = intersection
             if vertex.type == 'root':
-                self._create_visualization_frame(step_info + " - Root Node")
                 if len(vertex.C_prime) > 1:
                     vertex.C_prime = {random.choice(tuple(vertex.C_prime))}
                 vertex.status = PROCESSED
@@ -286,9 +246,7 @@ class PhylogeneticNetwork_Viz:
                     stack.append(child)
                     continue
 
-                self._highlighted_nodes = {child.id}
                 step_info = f"Resolving Node {child.id}"
-                self._create_visualization_frame(step_info + " - Start")
 
                 if v_prime <= child.C_prime:
                     child.C_prime = v_prime.copy()
@@ -312,9 +270,7 @@ class PhylogeneticNetwork_Viz:
                 if len(child.C_prime) == 1:
                     child.final_C = min(child.C_prime)
                 else:
-                    self._highlighted_nodes = {child.id}
                     step_info = f"Final Resolving Node {child.id}"
-                    self._create_visualization_frame(step_info + " - Start")
                     if {v_prime} <= child.C_prime.copy():
                         child.C_prime = {v_prime}
                         child.final_C = v_prime
@@ -361,9 +317,7 @@ class PhylogeneticNetwork_Viz:
             print(f"Warning: Processing reticulation structure for {vr.id}, but v1/v2/vr not all UNPROCESSED (Statuses: {v1.status}/{v2.status}/{vr.status}). Skipping.")
             return False
                 
-        self._highlighted_nodes = {v1.id, v2.id, vr.id}
         step_info = f"Processing Reticulation Structure @ {vr.id}"
-        self._create_visualization_frame(step_info + " - Start")
         
         C_prime_v1 = set()
         C_prime_v2 = None
@@ -379,14 +333,11 @@ class PhylogeneticNetwork_Viz:
                 self.resolve(w1)
             elif w1.C_prime < wr.C_prime:
                 wr.C_prime = w1.C_prime.copy()
-                #TODO: This seems logical but is it correct?
                 C_prime_v1 = w1.C_prime.copy()
                 self.resolve(wr)
                 
         else:
-            #TODO: This is not mentioned in the paper. Is it correct?
             C_prime_vr = w1.C_prime.copy() | wr.C_prime.copy()
-            
             C_prime_v1 = w1.C_prime.copy() | wr.C_prime.copy()
             C_prime_v2 = w2.C_prime.copy() | wr.C_prime.copy()
         
@@ -408,19 +359,12 @@ class PhylogeneticNetwork_Viz:
                     print(f"Error: v2 ({v2.id}) has multiple parents. Cannot process.")
                     return False
             v2_parent = v2.parents[0] if v2.parents else None
-            self._highlighted_nodes = {v1.id, v2.id, vr.id, w2.id, wr.id, v2_parent.id if v2_parent else None}
-            self._create_visualization_frame("Pre - Reticulation to Tree")
             
             self.delete_vertex(v2.id)
-            v2_parent.add_child(w2)
-                     
-            self._highlighted_nodes = {v1.id, vr.id, w2.id, wr.id, v2_parent.id if v2_parent else None}
-            self._create_visualization_frame("In Process - Reticulation to Tree")
-            
+            v2_parent.add_child(w2)            
             self.delete_vertex(vr.id)
             v1.add_child(wr)
             
-            self._highlighted_nodes = {v1.id, w2.id, wr.id, v2_parent.id if v2_parent else None}
             self._create_visualization_frame("Post - Reticulation to Tree")
             return True
                 
@@ -435,9 +379,7 @@ class PhylogeneticNetwork_Viz:
              print(f"Error: Workaround called but wr child ({vr.children[0].id if vr.children else 'None'}) is not processed.")
              return False
         
-        self._highlighted_nodes = {vr.id, v_ready.id}
         step_info = f"Processing Reticulation Workaround @ {vr.id} (using {v_ready.id})"
-        self._create_visualization_frame(step_info + " - Start")
         
         vr.C_prime = w_ready.C_prime.copy() | wr.C_prime.copy()
         v_ready.C_prime = w_ready.C_prime.copy() | wr.C_prime.copy()
@@ -486,13 +428,11 @@ class PhylogeneticNetwork_Viz:
         while True:
             progress_made = False
 
-            # -- Priority 1: process all ready tree/root vertices -----------
             while queue_tree:
                 v = queue_tree.popleft()
                 in_tree_q.discard(v.id)
                 if self._process_tree_node(v):
                     progress_made = True
-                    # its parents may now be ready
                     for p in v.parents:
                         if p.type in ("tree", "root"):
                             _maybe_enqueue_tree(p)
@@ -502,13 +442,11 @@ class PhylogeneticNetwork_Viz:
                             if c.type == "reticulation":
                                 _maybe_enqueue_retic(c)
 
-            # -- Priority 2: process one ready reticulation structure -------
             if queue_retic:
                 v1, v2, vr, w1, w2, wr = queue_retic.popleft()
                 in_retic_q.discard(vr.id)
                 if self._process_reticulation_structure(v1, v2, vr, w1, w2, wr):
                     progress_made = True
-                    # parents of v1/v2 might now be ready tree nodes
                     for node in (v1, v2):
                         for p in node.parents:
                             if p.type in ("tree", "root"):
@@ -594,7 +532,6 @@ class PhylogeneticNetwork_Viz:
                         ham_dist2 = 0
                     else:
                         ham_dist2 = 1
-                    #TODO: Might have to be the other way around?
                     if ham_dist1 < ham_dist2 or (ham_dist1 == ham_dist2 and random.random() < 0.5):
                         self._reticulation_to_tree(v1, v2, vertex, v2.get_other_child(vertex), vertex.children[0])
                     else:
@@ -614,7 +551,6 @@ class PhylogeneticNetwork_Viz:
             if v_node.final_C is None:
                 print(f"Warning: Vertex {v_id} has no final C assignment.")          
 
-        #Categorize Edges for Final Visualization
         scoring_edges_final = []
         non_scoring_edges_final = []
         processed_edges_viz = set()
@@ -641,10 +577,6 @@ class PhylogeneticNetwork_Viz:
 
                 processed_edges_viz.add(edge)
 
-        self._create_visualization_frame("After Final Cleanup", phase="final",
-                                         scoring_edges=scoring_edges_final,
-                                         non_scoring_edges=non_scoring_edges_final)
-
         total_score = len(scoring_edges_final)
 
         self._create_visualization_frame(f"Final Score: {total_score}", phase="final",
@@ -661,15 +593,13 @@ class PhylogeneticNetwork_Viz:
             self._initialize_algorithm(char_C)
             self._iterative_processing()
             pre_score, assignment = self._finalize_assignments_and_score()
-            print(f"Pre-Score: {pre_score}")
-            #WHAT IF I RUN ALGO AGAIN?
             self._initialize_algorithm(char_C)
             self._iterative_processing()
             score, assignment = self._finalize_assignments_and_score()
             self.create_output_video(output_video, fps, keep_frames)
             return pre_score, score, assignment
         except Exception as e:
-            print(f"\n--- Algorithm Failed ---")
+            print(f"Algorithm Failed")
             print(f"Error: {e}")
             import traceback
             traceback.print_exc()
