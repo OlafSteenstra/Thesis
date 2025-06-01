@@ -3,7 +3,7 @@ import re
 import pathlib
 import time
 from typing import Dict, Set, List, Tuple
-from latest import MPNet, PhylogeneticNetwork, PhylogeneticNetwork_Viz, Vertex
+from Code import MPNet, PhylogeneticNetwork, PhylogeneticNetwork_Viz, Vertex
 from PhylogeneticNetwork import PhylogeneticNetwork
 from PhylogeneticNetwork_Viz import PhylogeneticNetwork_Viz
 from Vertex import Vertex

@@ -1,8 +1,8 @@
-from latest import PhylogeneticNetwork, PhylogeneticNetwork_Viz, Vertex
-from latest.PhylogeneticNetwork import PhylogeneticNetwork
-from latest.PhylogeneticNetwork_Viz import PhylogeneticNetwork_Viz
-from latest.Vertex import Vertex
-from latest.Helper import enewick_to_network
+from Code import PhylogeneticNetwork, PhylogeneticNetwork_Viz, Vertex
+from Code.PhylogeneticNetwork import PhylogeneticNetwork
+from Code.PhylogeneticNetwork_Viz import PhylogeneticNetwork_Viz
+from Code.Vertex import Vertex
+from Code.Helper import enewick_to_network
 import random
 class TestCases:
     def test_case_1(self, viz: bool = False):

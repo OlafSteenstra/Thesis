@@ -1,6 +1,6 @@
-from latest import *
-from latest.Helper import compare_to_exact
-from latest.TestCases import *
+from Code import *
+from Code.Helper import compare_to_exact
+from Code.TestCases import *
 import csv
 import os
 
