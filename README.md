@@ -19,7 +19,6 @@ Before setting up the Python environment, ensure you have the following external
 2.  **IBM ILOG CPLEX Optimization Studio:** The `cplex` component is necessary for the `MPNet` solver to function. The current code assumes CPLEX Studio 22.1.2 (or compatible).
 3.  **MPNet Java Executable:** You need the compiled `MPNet.jar` or `MPNet.class` files from the `MPNet` project. This project assumes you have the `MPNet.java` source and have compiled it into a class file.
 4.  **Graphviz:** Highly recommended for `networkx` to generate visually appealing and efficient network layouts for visualization. Install it via your system's package manager (e.g., `sudo apt-get install graphviz` on Ubuntu, `brew install graphviz` on macOS).
-5.  **FFmpeg:** Required by `imageio` to create MP4 video outputs (if you wish to use that format instead of GIF for visualizations). Install it via your system's package manager.
 
 ## Installation
 
